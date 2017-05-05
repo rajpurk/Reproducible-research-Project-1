@@ -1,0 +1,138 @@
+---
+title: "PA1_template"
+author: "Raj Purkayastha"
+date: "5 May 2017"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading the data
+
+We will start the analysis by loading the data via read.csv. At this point I will not be modifying the data 
+
+```{r loading, echo=TRUE}
+myactivity<-read.csv('activity.csv')
+
+```
+##Determining the mean total number of steps taken per day
+
+We will first remove al the NA's present in this data set
+```{r removing NAs, echo = TRUE}
+mycleanactivity<-myactivity[complete.cases(myactivity),]
+```
+After this we can use the aggregate function on the new data frame to calculate the total number of steps taken per day
+
+```{r Total number of steps per day, echo = TRUE}
+dailysteps<-aggregate(mycleanactivity$steps,FUN=sum,by=list(mycleanactivity$date))
+colnames(dailysteps)<-c('Date','Total Steps')
+
+```
+
+The results can be plotted as a histogram using the following code
+
+```{r plotting histogram, echo = TRUE}
+hist(dailysteps$`Total Steps`,main='Histogram of Total steps taken each day',xlab='Total Steps',col='blue',xlim=c(0,25000),ylim=c(0,20),breaks=10)
+
+```
+
+The mean and median are calculated as follows
+
+```{r mean and median, echo = TRUE}
+dailystepsmean<- mean(dailysteps$`Total Steps`)
+dailystepsmedian<-median(dailysteps$`Total Steps`)
+```
+
+The mean of daily steps taken is `r dailystepsmean` and the median value is `r dailystepsmedian` .
+
+##Determining the average daily activity pattern
+
+to determine this we will plot a time series plot of the average number of steps taken for each interval across all the days
+
+```{r interval time series, echo = TRUE}
+intervalsteps<-aggregate(mycleanactivity$steps,FUN=mean,by=list(mycleanactivity$interval))
+colnames(intervalsteps)<-c('Interval','Average Steps')
+
+plot(intervalsteps$Interval,intervalsteps$`Average Steps`,type='l',xlab='Interval Number',ylab='Average number of Steps',lwd=2)
+
+```
+
+The interval which contains the maximum nuber of steps is determined the following way
+
+```{r max steps, echo = TRUE}
+maxintervalsteps<-max(intervalsteps$`Average Steps`)
+locmaxintervalsteps<-which.max(intervalsteps$`Average Steps`)
+maxintervalsteps_val<-intervalsteps$Interval[locmaxintervalsteps]
+
+```
+
+The interval number `r maxintervalsteps_val` has a maximum number of steps which is `r maxintervalsteps`. 
+
+##Imputing missing values
+
+The number of missing values is calculated as follows
+
+```{r missing values, echo = TRUE}
+logicals<-is.na(myactivity$steps)
+totalna<-sum(logicals)
+```
+
+The number of missing values is `r totalna`.
+
+To impute missing values we use the Mice library. Using the mice function we perform the following procedure
+
+```{r imputing}
+ library(mice)
+tempdata<-mice(myactivity,m=5,maxit=50,meth='pmm',seed=500)
+completeactivity<-complete(tempdata,1)
+```
+
+m=5 refers to the number of imputed datasets, pmm refers to the method which is predictive Mean matching. 
+
+We then generate a histogram of total number of steps along with mean and median calculations.
+
+```{r complete data set}
+ca_dailysteps<-aggregate(completeactivity$steps,FUN=sum,by=list(completeactivity$date))
+colnames(ca_dailysteps)<-c('Date','Total Steps')
+hist(ca_dailysteps$`Total Steps`,main='Histogram of Total steps taken each day for imputed set',xlab='Total Steps',col='blue',xlim=c(0,25000),ylim=c(0,20),breaks=10)
+
+ca_dailystepsmean<- mean(ca_dailysteps$`Total Steps`)
+ca_dailystepsmedian<-median(ca_dailysteps$`Total Steps`)
+
+```
+The mean of daily steps taken is `r ca_dailystepsmean` and the median value is `r ca_dailystepsmedian` . These values differ and are lower. This implies that he method used for substitution on the whole, put in lower values than the mean for the NA values. 
+
+##Comparing activity patterns between weekdays and weekends
+
+First we create a new factor variable
+
+```{r weekday}
+library(timeDate)
+isweekdaycol<-isWeekday(completeactivity$date)
+isweekendcol<-isWeekend(completeactivity$date)
+completeactivity$wDay<-factor(isweekdaycol,levels=c(FALSE,TRUE),labels=c('Weekend','weekday'))
+
+ca_weekday<-completeactivity[isweekdaycol,]
+ca_weekend<-completeactivity[isweekendcol,]
+
+wkday_intervalsteps<-aggregate(ca_weekday$steps,FUN=mean,by=list(ca_weekday$interval))
+colnames(wkday_intervalsteps)<-c('Interval','Average Steps')
+
+wkend_intervalsteps<-aggregate(ca_weekend$steps,FUN=mean,by=list(ca_weekend$interval))
+colnames(wkend_intervalsteps)<-c('Interval','Average Steps')
+```
+We then proceed to create a panel plot with average number of steps taken averaged across all weekdays and weekends.
+
+```{r weekday panel plot}
+
+
+par(mfrow=c(2,1))
+plot(wkday_intervalsteps$Interval,wkday_intervalsteps$`Average Steps`,type='l',main='Comparison of Steps on the weekday and weekend',xlab='Interval Number',ylab='Weekday ',lwd=2,col='blue')
+
+plot(wkend_intervalsteps$Interval,wkend_intervalsteps$`Average Steps`,type='l',xlab='Interval Number',ylab='Weekend ',lwd=2,col='red')
+
+```
